@@ -115,6 +115,27 @@ html, body {
   max-width: 320px;
 }
 
+#layer-toggles {
+  position: absolute;
+  top: 56px;
+  left: 12px;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  color: #222;
+}
+
+#layer-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
 #zoom-overlay {
   position: absolute;
   inset: 0;

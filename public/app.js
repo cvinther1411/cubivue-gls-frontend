@@ -17,11 +17,21 @@ const clusterGroup = L.markerClusterGroup({
 map.addLayer(clusterGroup);
 
 const roadSnapLayer = L.layerGroup().addTo(map);
+const voronoiLayer = L.layerGroup(); // not added to the map until the toggle is checked
 
 const statusText = document.getElementById("status-text");
 const locationsSpinner = document.getElementById("locations-spinner");
 const zoomOverlay = document.getElementById("zoom-overlay");
 const zoomOverlayDetail = document.getElementById("zoom-overlay-detail");
+const voronoiToggle = document.getElementById("voronoi-toggle");
+
+voronoiToggle.addEventListener("change", () => {
+  if (voronoiToggle.checked) {
+    map.addLayer(voronoiLayer);
+  } else {
+    map.removeLayer(voronoiLayer);
+  }
+});
 
 let debounceTimer = null;
 let currentAbort = null;
@@ -54,6 +64,19 @@ function renderLocations(locations) {
     .map((loc) => L.marker([loc.lat, loc.lon]).bindPopup(popupHtml(loc)));
   clusterGroup.addLayers(markers);
   renderRoadSnaps(locations);
+  renderVoronoi(locations);
+}
+
+function renderVoronoi(locations) {
+  voronoiLayer.clearLayers();
+  for (const loc of locations) {
+    if (!loc.voronoi) continue;
+    L.geoJSON(loc.voronoi, {
+      style: { color: "#6a51a3", weight: 1, fillColor: "#9e9ac8", fillOpacity: 0.25 },
+    })
+      .bindTooltip(escapeHtml(loc.label || ""))
+      .addTo(voronoiLayer);
+  }
 }
 
 function renderRoadSnaps(locations) {
@@ -96,6 +119,7 @@ async function loadLocations() {
     showZoomOverlay(true, `Current zoom ${zoom} — zoom to at least ${CLIENT_MIN_ZOOM}`);
     clusterGroup.clearLayers();
     roadSnapLayer.clearLayers();
+    voronoiLayer.clearLayers();
     setStatus("Zoom in to load GLS locations.");
     locationsSpinner.classList.add("hidden");
     return;
@@ -126,12 +150,14 @@ async function loadLocations() {
       setStatus(data.error || "Failed to load locations.");
       clusterGroup.clearLayers();
       roadSnapLayer.clearLayers();
+      voronoiLayer.clearLayers();
       return;
     }
 
     if (data.status === "area_too_large") {
       clusterGroup.clearLayers();
       roadSnapLayer.clearLayers();
+      voronoiLayer.clearLayers();
       showZoomOverlay(true, "Zoom in further — visible area is too large");
       setStatus(data.message);
       return;
@@ -140,6 +166,7 @@ async function loadLocations() {
     if (data.status === "too_many_results") {
       clusterGroup.clearLayers();
       roadSnapLayer.clearLayers();
+      voronoiLayer.clearLayers();
       showZoomOverlay(true, `${data.count} locations in view — zoom in further`);
       setStatus(data.message);
       return;

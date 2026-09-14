@@ -116,6 +116,11 @@ def simplify(item: dict) -> dict:
                 "distanceMeter": snap.get("distanceInMeter"),
             }
         )
+    voronoi = None
+    for geom in item.get("geometries") or []:
+        if geom.get("type") == "voronoi":
+            voronoi = geom.get("geometry")
+            break
     return {
         "id": item.get("id"),
         "lat": loc.get("latitude"),
@@ -125,6 +130,7 @@ def simplify(item: dict) -> dict:
         "city": city,
         "countryCode": comp.get("countryCode"),
         "roadSnaps": road_snaps,
+        "voronoi": voronoi,
     }
 
 
