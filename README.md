@@ -28,6 +28,11 @@ thousands of results.
   right with everything the API returns for it: full address, exact
   coordinates/ID, every road-snap (mode, distance, snap point, OSM node
   IDs), and Voronoi polygon info.
+- **QA / Prod toggle** — top-left buttons switch which GLS environment
+  every request targets (Prod highlighted red as a visual "this is real
+  data" warning). Switching clears the map and re-fetches for the current
+  view immediately. The Prod button only appears if Prod credentials are
+  configured (see below).
 
 ## Why there's a small backend
 
@@ -53,7 +58,13 @@ rest — everything this app uses — is read-only.
 
 ## Setup
 
-Copy `.env.example` to `.env` and fill in the GLS QA client id/secret.
+Copy `.env.example` to `.env` and fill in `GLS_QA_CLIENT_ID` /
+`GLS_QA_CLIENT_SECRET`. Also filling in the `GLS_PROD_*` values enables the
+Prod button in the UI; leaving them blank runs QA-only. QA and Prod are
+separate GLS deployments with separate credentials, base URLs, and even a
+different `include` query param (GLS's own Postman collections for each
+show that) — the server keeps them as fully independent configs, never
+mixing a client secret with the other environment's host.
 
 ## Run
 

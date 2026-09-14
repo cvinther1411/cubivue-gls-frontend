@@ -48,6 +48,53 @@ roadSnapToggle.addEventListener("change", () => {
   }
 });
 
+// --- QA / Prod environment toggle ---
+
+const envSelector = document.getElementById("env-selector");
+const envButtons = Array.from(document.querySelectorAll(".env-btn"));
+let currentEnv = "qa";
+
+function updateEnvButtons() {
+  envButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.env === currentEnv));
+}
+
+function switchEnv(envName) {
+  if (envName === currentEnv) return;
+  currentEnv = envName;
+  updateEnvButtons();
+  detailPanel.classList.add("hidden");
+  clusterGroup.clearLayers();
+  roadSnapLayer.clearLayers();
+  voronoiLayer.clearLayers();
+  if (debounceTimer) clearTimeout(debounceTimer);
+  loadLocations();
+}
+
+envButtons.forEach((btn) => {
+  btn.addEventListener("click", () => switchEnv(btn.dataset.env));
+});
+
+async function initEnvironments() {
+  try {
+    const resp = await fetch("/api/environments");
+    const data = await resp.json();
+    const available = data.environments || [];
+    envButtons.forEach((btn) => {
+      btn.classList.toggle("hidden", !available.includes(btn.dataset.env));
+    });
+    if (available.length < 2) {
+      envSelector.classList.add("hidden"); // nothing to toggle between
+    }
+    currentEnv = data.default || currentEnv;
+    updateEnvButtons();
+  } catch (err) {
+    // Keep the default "qa" silently — the selector just won't reflect
+    // real availability if this call fails.
+  }
+}
+
+initEnvironments();
+
 let debounceTimer = null;
 let currentAbort = null;
 let requestSeq = 0;
@@ -197,6 +244,7 @@ async function loadLocations() {
     minLat: bounds.getSouth(),
     maxLon: bounds.getEast(),
     maxLat: bounds.getNorth(),
+    env: currentEnv,
   });
 
   const abort = new AbortController();

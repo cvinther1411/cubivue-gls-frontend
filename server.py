@@ -47,31 +47,47 @@ def load_env(path: Path) -> dict:
 
 
 ENV = load_env(ROOT / ".env")
-CLIENT_ID = ENV.get("GLS_CLIENT_ID", "")
-CLIENT_SECRET = ENV.get("GLS_CLIENT_SECRET", "")
-BASE_URL = ENV.get("GLS_BASE_URL", "").rstrip("/")
-INCLUDE = ENV.get("GLS_INCLUDE", "a,ac,rt,gs,da,dac")
 
-if not (CLIENT_ID and CLIENT_SECRET and BASE_URL):
+# Each configured environment (qa, prod, ...) gets its own client
+# id/secret/base URL/include list — GLS treats them as entirely separate
+# deployments with separate data. An environment is only enabled if all
+# three of CLIENT_ID/CLIENT_SECRET/BASE_URL are set for it.
+ENVIRONMENTS: dict[str, dict] = {}
+for env_name in ("qa", "prod"):
+    prefix = f"GLS_{env_name.upper()}_"
+    client_id = ENV.get(f"{prefix}CLIENT_ID", "")
+    client_secret = ENV.get(f"{prefix}CLIENT_SECRET", "")
+    base_url = ENV.get(f"{prefix}BASE_URL", "").rstrip("/")
+    if client_id and client_secret and base_url:
+        ENVIRONMENTS[env_name] = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "base_url": base_url,
+            "include": ENV.get(f"{prefix}INCLUDE", "a,ac,rt,gs,da,dac"),
+        }
+
+if not ENVIRONMENTS:
     raise SystemExit(
-        "Missing GLS_CLIENT_ID / GLS_CLIENT_SECRET / GLS_BASE_URL. "
-        "Copy .env.example to .env and fill it in."
+        "No GLS environment configured. Copy .env.example to .env and fill "
+        "in at least the GLS_QA_* values."
     )
 
+DEFAULT_ENVIRONMENT = "qa" if "qa" in ENVIRONMENTS else next(iter(ENVIRONMENTS))
 
-def sign_request() -> tuple[str, str]:
+
+def sign_request(client_id: str, client_secret: str) -> tuple[str, str]:
     timestamp = str(int(time.time()))
     digest = hmac.new(
-        CLIENT_SECRET.encode("utf-8"), timestamp.encode("utf-8"), hashlib.sha256
+        client_secret.encode("utf-8"), timestamp.encode("utf-8"), hashlib.sha256
     ).digest()
-    hash_value = f"{CLIENT_ID}:{base64.b64encode(digest).decode('ascii')}"
+    hash_value = f"{client_id}:{base64.b64encode(digest).decode('ascii')}"
     return timestamp, hash_value
 
 
-def _post(path: str, body: dict, timeout: int = 20) -> dict:
-    timestamp, hash_value = sign_request()
+def _post(env: dict, path: str, body: dict, timeout: int = 20) -> dict:
+    timestamp, hash_value = sign_request(env["client_id"], env["client_secret"])
     req = urllib.request.Request(
-        f"{BASE_URL}{path}",
+        f"{env['base_url']}{path}",
         data=json.dumps(body).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
@@ -84,7 +100,7 @@ def _post(path: str, body: dict, timeout: int = 20) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def count_locations(min_lon, min_lat, max_lon, max_lat) -> int:
+def count_locations(env: dict, min_lon, min_lat, max_lon, max_lat) -> int:
     # Locations/count only takes an area polygon (no bbox variant), but it
     # returns just a number — no location payload — so it's cheap even for
     # a huge box.
@@ -100,18 +116,18 @@ def count_locations(min_lon, min_lat, max_lon, max_lat) -> int:
             ]
         ],
     }
-    raw = _post("/internal/v2/Locations/count", polygon)
+    raw = _post(env, "/internal/v2/Locations/count", polygon)
     return raw.get("data", {}).get("locationCount", 0)
 
 
-def fetch_locations(min_lon, min_lat, max_lon, max_lat) -> dict:
+def fetch_locations(env: dict, min_lon, min_lat, max_lon, max_lat) -> dict:
     body = {
         "minLatitude": min_lat,
         "minLongitude": min_lon,
         "maxLatitude": max_lat,
         "maxLongitude": max_lon,
     }
-    return _post(f"/internal/v2/Locations/within-bbox?include={INCLUDE}", body)
+    return _post(env, f"/internal/v2/Locations/within-bbox?include={env['include']}", body)
 
 
 def simplify(item: dict) -> dict:
@@ -171,9 +187,23 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/locations":
             self.handle_locations(parse_qs(parsed.query))
             return
+        if parsed.path == "/api/environments":
+            self.send_json(
+                200, {"environments": list(ENVIRONMENTS.keys()), "default": DEFAULT_ENVIRONMENT}
+            )
+            return
         self.serve_static(parsed.path)
 
     def handle_locations(self, query: dict):
+        env_name = query.get("env", [DEFAULT_ENVIRONMENT])[0]
+        env = ENVIRONMENTS.get(env_name)
+        if env is None:
+            self.send_json(
+                400,
+                {"error": f"unknown environment '{env_name}' — available: {', '.join(ENVIRONMENTS)}"},
+            )
+            return
+
         try:
             min_lon = float(query["minLon"][0])
             min_lat = float(query["minLat"][0])
@@ -188,7 +218,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            count = count_locations(min_lon, min_lat, max_lon, max_lat)
+            count = count_locations(env, min_lon, min_lat, max_lon, max_lat)
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 count = 0  # GLS returns 404 for an area with no locations at all
@@ -217,7 +247,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            raw = fetch_locations(min_lon, min_lat, max_lon, max_lat)
+            raw = fetch_locations(env, min_lon, min_lat, max_lon, max_lat)
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 self.send_json(200, {"status": "ok", "count": 0, "locations": []})
