@@ -81,6 +81,8 @@ function showDetailPanel(loc) {
   detailTitle.textContent = loc.label || "Location";
 
   const addressRows = [
+    ["Street", loc.street],
+    ["House number", loc.houseNumber],
     ["Zip code", loc.zipCode],
     ["City", loc.city],
     ["Country", loc.countryCode],
