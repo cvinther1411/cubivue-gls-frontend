@@ -1,5 +1,7 @@
 # GLS Locations Map
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-cvinther1411%2Fcubivue--gls--frontend-181717?logo=github)](https://github.com/cvinther1411/cubivue-gls-frontend)
+
 Interactive map (Leaflet) showing locations from the GLS `within-area`
 internal API. Locations load automatically from the current map bounds as
 you pan/zoom, but only once you're zoomed in enough that the request
