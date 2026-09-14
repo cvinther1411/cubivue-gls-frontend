@@ -218,15 +218,6 @@ async function loadLocations() {
       return;
     }
 
-    if (data.status === "area_too_large") {
-      clusterGroup.clearLayers();
-      roadSnapLayer.clearLayers();
-      voronoiLayer.clearLayers();
-      showZoomOverlay(true, "Zoom in further — visible area is too large");
-      setStatus(data.message);
-      return;
-    }
-
     if (data.status === "too_many_results") {
       clusterGroup.clearLayers();
       roadSnapLayer.clearLayers();

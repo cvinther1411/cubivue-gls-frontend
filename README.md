@@ -2,7 +2,7 @@
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-cvinther1411%2Fcubivue--gls--frontend-181717?logo=github)](https://github.com/cvinther1411/cubivue-gls-frontend)
 
-Interactive map (Leaflet) showing locations from the GLS `within-area`
+Interactive map (Leaflet) showing locations from the GLS Locations
 internal API. Locations load automatically from the current map bounds as
 you pan/zoom, but only once you're zoomed in enough that the request
 returns a reasonable number of points — this dataset is dense (individual
@@ -13,16 +13,21 @@ thousands of results.
 
 The GLS API needs an HMAC-SHA256 request signature computed from a client
 secret. That secret can't live in browser JS (anyone could read it from
-page source), so `server.py` signs each request server-side and proxies
-just the bounding box query to GLS. It also strips each result down to the
-fields the map needs and enforces two safety limits:
+page source), so `server.py` signs each request server-side. It also
+strips each result down to the fields the map needs, and calls two GLS
+endpoints per request:
 
-- a maximum bounding-box area (`MAX_BBOX_AREA_DEG2` in `server.py`) — if
-  the visible map area is larger than this, the client is told to zoom in
-  further without ever calling GLS
-- a maximum result count (`MAX_RESULTS`) — if GLS still returns more than
-  this for the given box, the client is told to zoom in rather than being
-  sent thousands of markers
+- `Locations/count` first — a cheap call that returns just a number, no
+  location data. If that's more than `MAX_RESULTS` (in `server.py`), the
+  client is told to zoom in further and GLS is never asked for the actual
+  data.
+- `Locations/within-bbox` — only once `count` is within budget, this
+  fetches the actual locations for the box.
+
+GLS's Swagger docs (`/swagger/v2/swagger.json` on the API host) list a
+fair bit more than these two — `geocode`/`reverse-geocode`, `get-by-ids`,
+`address-wash/*` — not wired into this app, but worth knowing about if you
+extend it.
 
 ## Setup
 

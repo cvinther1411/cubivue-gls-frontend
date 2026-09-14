@@ -1,8 +1,10 @@
 """Local dev server for the GLS locations map.
 
 Serves the static frontend from public/ and proxies bounding-box queries to
-the GLS within-area API, signing each request with HMAC-SHA256 server-side
-so the client secret never reaches the browser.
+the GLS Locations API, signing each request with HMAC-SHA256 server-side so
+the client secret never reaches the browser. Each request first calls
+Locations/count (cheap — no data payload) to decide whether the box is
+small enough to fetch, then Locations/within-bbox for the actual data.
 
 Run:
     py server.py
@@ -25,15 +27,10 @@ ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
 PORT = 8787
 
-# Maximum bounding-box area (in square degrees) we'll forward to GLS.
-# Calibrated against the QA dataset: a 0.01x0.01 deg box returns ~600
-# locations there, which is already a lot to render as individual markers.
-# Above this the caller is told to zoom in further instead of us shipping a
-# multi-MB response to the browser.
-MAX_BBOX_AREA_DEG2 = 0.00015
-
-# Even inside an allowed bbox, cap how many features we forward to the
-# client so a dense area never sends more than this many markers.
+# Before fetching any data, we ask GLS's Locations/count endpoint how many
+# locations are in the requested box. If that's more than this, we tell the
+# caller to zoom in further instead of fetching (and shipping to the
+# browser) a payload full of markers nobody can usefully look at.
 MAX_RESULTS = 1200
 
 
@@ -71,7 +68,26 @@ def sign_request() -> tuple[str, str]:
     return timestamp, hash_value
 
 
-def fetch_locations(min_lon, min_lat, max_lon, max_lat):
+def _post(path: str, body: dict, timeout: int = 20) -> dict:
+    timestamp, hash_value = sign_request()
+    req = urllib.request.Request(
+        f"{BASE_URL}{path}",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Timestamp": timestamp,
+            "Hash": hash_value,
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def count_locations(min_lon, min_lat, max_lon, max_lat) -> int:
+    # Locations/count only takes an area polygon (no bbox variant), but it
+    # returns just a number — no location payload — so it's cheap even for
+    # a huge box.
     polygon = {
         "type": "Polygon",
         "coordinates": [
@@ -84,20 +100,18 @@ def fetch_locations(min_lon, min_lat, max_lon, max_lat):
             ]
         ],
     }
-    timestamp, hash_value = sign_request()
-    url = f"{BASE_URL}/internal/v2/locations/within-area/?include={INCLUDE}"
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(polygon).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Timestamp": timestamp,
-            "Hash": hash_value,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    raw = _post("/internal/v2/Locations/count", polygon)
+    return raw.get("data", {}).get("locationCount", 0)
+
+
+def fetch_locations(min_lon, min_lat, max_lon, max_lat) -> dict:
+    body = {
+        "minLatitude": min_lat,
+        "minLongitude": min_lon,
+        "maxLatitude": max_lat,
+        "maxLongitude": max_lon,
+    }
+    return _post(f"/internal/v2/Locations/within-bbox?include={INCLUDE}", body)
 
 
 def simplify(item: dict) -> dict:
@@ -172,25 +186,39 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": "invalid bounding box"})
             return
 
-        area = (max_lon - min_lon) * (max_lat - min_lat)
-        if area > MAX_BBOX_AREA_DEG2:
+        try:
+            count = count_locations(min_lon, min_lat, max_lon, max_lat)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                count = 0  # GLS returns 404 for an area with no locations at all
+            else:
+                detail = exc.read().decode("utf-8", errors="replace")
+                self.send_json(502, {"error": f"GLS API error {exc.code}", "detail": detail[:500]})
+                return
+        except urllib.error.URLError as exc:
+            self.send_json(502, {"error": f"Could not reach GLS API: {exc.reason}"})
+            return
+
+        if count > MAX_RESULTS:
             self.send_json(
                 200,
                 {
-                    "status": "area_too_large",
-                    "message": "Zoom in further — the visible area is too large to load locations.",
+                    "status": "too_many_results",
+                    "message": f"{count} locations in view — zoom in further to load them.",
+                    "count": count,
                     "locations": [],
                 },
             )
+            return
+
+        if count == 0:
+            self.send_json(200, {"status": "ok", "count": 0, "locations": []})
             return
 
         try:
             raw = fetch_locations(min_lon, min_lat, max_lon, max_lat)
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
-                # GLS returns 404 for areas with no locations at all (outside its
-                # coverage, or just empty) — that's a normal empty result, not a
-                # failure.
                 self.send_json(200, {"status": "ok", "count": 0, "locations": []})
                 return
             detail = exc.read().decode("utf-8", errors="replace")
@@ -201,24 +229,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         data = raw.get("data", [])
-        total = len(data)
-        if total > MAX_RESULTS:
-            self.send_json(
-                200,
-                {
-                    "status": "too_many_results",
-                    "message": f"{total} locations in view — zoom in further to load them.",
-                    "count": total,
-                    "locations": [],
-                },
-            )
-            return
-
         self.send_json(
             200,
             {
                 "status": "ok",
-                "count": total,
+                "count": len(data),
                 "locations": [simplify(item) for item in data],
             },
         )
