@@ -118,8 +118,7 @@ function showDetailPanel(loc) {
 
     <h3>Coordinates</h3>
     <table>
-      <tr><td>Latitude</td><td><code>${escapeHtml(loc.lat)}</code></td></tr>
-      <tr><td>Longitude</td><td><code>${escapeHtml(loc.lon)}</code></td></tr>
+      <tr><td>Point</td><td><code>${escapeHtml(loc.lat)}, ${escapeHtml(loc.lon)}</code></td></tr>
       <tr><td>ID</td><td><code>${escapeHtml(loc.id || "—")}</code></td></tr>
     </table>
 
