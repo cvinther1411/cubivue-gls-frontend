@@ -24,12 +24,21 @@ const locationsSpinner = document.getElementById("locations-spinner");
 const zoomOverlay = document.getElementById("zoom-overlay");
 const zoomOverlayDetail = document.getElementById("zoom-overlay-detail");
 const voronoiToggle = document.getElementById("voronoi-toggle");
+const roadSnapToggle = document.getElementById("road-snap-toggle");
 
 voronoiToggle.addEventListener("change", () => {
   if (voronoiToggle.checked) {
     map.addLayer(voronoiLayer);
   } else {
     map.removeLayer(voronoiLayer);
+  }
+});
+
+roadSnapToggle.addEventListener("change", () => {
+  if (roadSnapToggle.checked) {
+    map.addLayer(roadSnapLayer);
+  } else {
+    map.removeLayer(roadSnapLayer);
   }
 });
 
