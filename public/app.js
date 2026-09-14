@@ -116,3 +116,69 @@ function scheduleLoad() {
 
 map.on("moveend zoomend", scheduleLoad);
 scheduleLoad();
+
+// --- Address/city search (Nominatim) ---
+
+const searchForm = document.getElementById("search-form");
+const searchInput = document.getElementById("search-input");
+const searchButton = document.getElementById("search-button");
+const searchResults = document.getElementById("search-results");
+
+function hideSearchResults() {
+  searchResults.classList.add("hidden");
+  searchResults.innerHTML = "";
+}
+
+function renderSearchResults(results) {
+  searchResults.innerHTML = "";
+  if (results.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No matches found.";
+    searchResults.appendChild(li);
+  } else {
+    for (const result of results) {
+      const li = document.createElement("li");
+      li.textContent = result.display_name;
+      li.addEventListener("click", () => goToSearchResult(result));
+      searchResults.appendChild(li);
+    }
+  }
+  searchResults.classList.remove("hidden");
+}
+
+function goToSearchResult(result) {
+  const [south, north, west, east] = result.boundingbox.map(Number);
+  map.fitBounds(
+    [
+      [south, west],
+      [north, east],
+    ],
+    { maxZoom: 18 }
+  );
+  hideSearchResults();
+}
+
+searchForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const query = searchInput.value.trim();
+  if (!query) return;
+
+  searchButton.disabled = true;
+  try {
+    const params = new URLSearchParams({ format: "jsonv2", q: query, limit: "5" });
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+    if (!resp.ok) throw new Error(`Nominatim returned ${resp.status}`);
+    const results = await resp.json();
+    renderSearchResults(results);
+  } catch (err) {
+    setStatus("Search failed: " + err.message);
+  } finally {
+    searchButton.disabled = false;
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (!searchForm.contains(e.target) && !searchResults.contains(e.target)) {
+    hideSearchResults();
+  }
+});

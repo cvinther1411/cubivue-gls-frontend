@@ -12,6 +12,12 @@
 <body>
   <div id="map"></div>
 
+  <form id="search-form" autocomplete="off">
+    <input id="search-input" type="text" placeholder="Search for an address or city…" />
+    <button id="search-button" type="submit">Search</button>
+  </form>
+  <ul id="search-results" class="hidden"></ul>
+
   <div id="status-bar">
     <span id="status-text">Loading map…</span>
   </div>
