@@ -166,6 +166,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             raw = fetch_locations(min_lon, min_lat, max_lon, max_lat)
         except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                # GLS returns 404 for areas with no locations at all (outside its
+                # coverage, or just empty) — that's a normal empty result, not a
+                # failure.
+                self.send_json(200, {"status": "ok", "count": 0, "locations": []})
+                return
             detail = exc.read().decode("utf-8", errors="replace")
             self.send_json(502, {"error": f"GLS API error {exc.code}", "detail": detail[:500]})
             return
