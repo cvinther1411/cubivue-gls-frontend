@@ -47,6 +47,26 @@ html, body {
   cursor: default;
 }
 
+.spinner {
+  align-self: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ccc;
+  border-top-color: #2c6fbb;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 #search-results {
   position: absolute;
   top: 50px;

@@ -123,6 +123,7 @@ const searchForm = document.getElementById("search-form");
 const searchInput = document.getElementById("search-input");
 const searchButton = document.getElementById("search-button");
 const searchResults = document.getElementById("search-results");
+const searchSpinner = document.getElementById("search-spinner");
 
 function hideSearchResults() {
   searchResults.classList.add("hidden");
@@ -164,6 +165,7 @@ searchForm.addEventListener("submit", async (e) => {
   if (!query) return;
 
   searchButton.disabled = true;
+  searchSpinner.classList.remove("hidden");
   try {
     const params = new URLSearchParams({ format: "jsonv2", q: query, limit: "5" });
     const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
@@ -174,6 +176,7 @@ searchForm.addEventListener("submit", async (e) => {
     setStatus("Search failed: " + err.message);
   } finally {
     searchButton.disabled = false;
+    searchSpinner.classList.add("hidden");
   }
 });
 
