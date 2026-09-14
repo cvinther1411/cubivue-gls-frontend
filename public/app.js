@@ -12,7 +12,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const clusterGroup = L.markerClusterGroup({
   maxClusterRadius: 50,
-  disableClusteringAtZoom: 20,
+  disableClusteringAtZoom: 18, // zoom 17 and below cluster; 18+ always shows individual markers
 });
 map.addLayer(clusterGroup);
 
