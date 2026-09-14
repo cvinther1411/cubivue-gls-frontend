@@ -15,6 +15,7 @@ const clusterGroup = L.markerClusterGroup({
 map.addLayer(clusterGroup);
 
 const statusText = document.getElementById("status-text");
+const locationsSpinner = document.getElementById("locations-spinner");
 const zoomOverlay = document.getElementById("zoom-overlay");
 const zoomOverlayDetail = document.getElementById("zoom-overlay-detail");
 
@@ -53,10 +54,13 @@ function renderLocations(locations) {
 async function loadLocations() {
   const zoom = map.getZoom();
 
+  if (currentAbort) currentAbort.abort();
+
   if (zoom < CLIENT_MIN_ZOOM) {
     showZoomOverlay(true, `Current zoom ${zoom} — zoom to at least ${CLIENT_MIN_ZOOM}`);
     clusterGroup.clearLayers();
     setStatus("Zoom in to load GLS locations.");
+    locationsSpinner.classList.add("hidden");
     return;
   }
   showZoomOverlay(false);
@@ -69,12 +73,12 @@ async function loadLocations() {
     maxLat: bounds.getNorth(),
   });
 
-  if (currentAbort) currentAbort.abort();
   const abort = new AbortController();
   currentAbort = abort;
   const seq = ++requestSeq;
 
   setStatus("Loading locations…");
+  locationsSpinner.classList.remove("hidden");
 
   try {
     const resp = await fetch(`/api/locations?${params.toString()}`, { signal: abort.signal });
@@ -106,6 +110,8 @@ async function loadLocations() {
   } catch (err) {
     if (err.name === "AbortError") return;
     setStatus("Error loading locations: " + err.message);
+  } finally {
+    if (seq === requestSeq) locationsSpinner.classList.add("hidden");
   }
 }
 
