@@ -1,16 +1,17 @@
 const CLIENT_MIN_ZOOM = 15; // below this we don't even try to fetch
 const DEBOUNCE_MS = 400;
 
-const map = L.map("map", { minZoom: 3, maxZoom: 19 }).setView([48.8195, 10.149], 17);
+const map = L.map("map", { minZoom: 3, maxZoom: 20 }).setView([48.8195, 10.149], 17);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
+  maxZoom: 20,
+  maxNativeZoom: 19, // OSM tiles stop at 19; Leaflet upscales them for zoom 20
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
 
 const clusterGroup = L.markerClusterGroup({
   maxClusterRadius: 50,
-  disableClusteringAtZoom: 19,
+  disableClusteringAtZoom: 20,
 });
 map.addLayer(clusterGroup);
 
