@@ -81,7 +81,7 @@ function renderVoronoi(locations) {
   for (const loc of locations) {
     if (!loc.voronoi) continue;
     L.geoJSON(loc.voronoi, {
-      style: { color: "#6a51a3", weight: 1, fillColor: "#9e9ac8", fillOpacity: 0.25 },
+      style: { color: "#6a51a3", weight: 1, fill: false },
     })
       .bindTooltip(escapeHtml(loc.label || ""))
       .addTo(voronoiLayer);
