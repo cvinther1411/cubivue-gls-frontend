@@ -114,6 +114,24 @@ function escapeHtml(str) {
   })[c]);
 }
 
+const COPY_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.2"/><path d="M3.5 10.5H2.7a1.2 1.2 0 0 1-1.2-1.2V2.7A1.2 1.2 0 0 1 2.7 1.5h6.6a1.2 1.2 0 0 1 1.2 1.2v.8"/></svg>`;
+
+function copyButtonHtml(text) {
+  return `<button type="button" class="copy-btn" data-copy="${escapeHtml(text)}" title="Copy coordinates" aria-label="Copy coordinates">${COPY_ICON}</button>`;
+}
+
+detailBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".copy-btn");
+  if (!btn) return;
+  try {
+    await navigator.clipboard.writeText(btn.dataset.copy);
+    btn.classList.add("copied");
+    setTimeout(() => btn.classList.remove("copied"), 1200);
+  } catch (err) {
+    setStatus("Copy failed: " + err.message);
+  }
+});
+
 function renderLocations(locations) {
   clusterGroup.clearLayers();
   const markers = locations
@@ -142,12 +160,13 @@ function showDetailPanel(loc) {
     ? loc.roadSnaps
         .map((snap) => {
           const distance = typeof snap.distanceMeter === "number" ? `${Math.round(snap.distanceMeter)} m` : "unknown";
-          const coords = typeof snap.lat === "number" && typeof snap.lon === "number" ? `${snap.lat.toFixed(6)}, ${snap.lon.toFixed(6)}` : "—";
+          const hasCoords = typeof snap.lat === "number" && typeof snap.lon === "number";
+          const coords = hasCoords ? `${snap.lat.toFixed(6)}, ${snap.lon.toFixed(6)}` : "—";
           const nodes = (snap.nodes || []).length ? snap.nodes.join(", ") : "—";
           return `<div class="snap-entry">
             <div><strong>${escapeHtml(snap.mode || "unknown mode")}</strong></div>
             <div>Distance: ${escapeHtml(distance)}</div>
-            <div>Snap point: <code>${escapeHtml(coords)}</code></div>
+            <div class="coord-row">Snap point: <code>${escapeHtml(coords)}</code>${hasCoords ? copyButtonHtml(coords) : ""}</div>
             <div>Nodes: <code>${escapeHtml(nodes)}</code></div>
           </div>`;
         })
@@ -165,7 +184,7 @@ function showDetailPanel(loc) {
 
     <h3>Coordinates</h3>
     <table>
-      <tr><td>Point</td><td><code>${escapeHtml(loc.lat)}, ${escapeHtml(loc.lon)}</code></td></tr>
+      <tr><td>Point</td><td class="coord-row"><code>${escapeHtml(loc.lat)}, ${escapeHtml(loc.lon)}</code>${copyButtonHtml(`${loc.lat}, ${loc.lon}`)}</td></tr>
       <tr><td>ID</td><td><code>${escapeHtml(loc.id || "—")}</code></td></tr>
     </table>
 

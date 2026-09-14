@@ -314,3 +314,30 @@ html, body {
   padding: 1px 4px;
   border-radius: 3px;
 }
+
+.coord-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.copy-btn {
+  border: none;
+  background: none;
+  padding: 2px;
+  margin: 0;
+  line-height: 0;
+  cursor: pointer;
+  color: #888;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  color: #2c6fbb;
+  background: #eef3fa;
+}
+
+.copy-btn.copied {
+  color: #2e9e4f;
+}
