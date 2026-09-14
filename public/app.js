@@ -1,4 +1,5 @@
 const CLIENT_MIN_ZOOM = 15; // below this we don't even try to fetch
+const ROAD_SNAP_MIN_ZOOM = 19; // below this, road-snap lines/points are hidden
 const DEBOUNCE_MS = 400;
 
 const map = L.map("map", { minZoom: 3, maxZoom: 20 }).setView([48.8195, 10.149], 17);
@@ -14,6 +15,8 @@ const clusterGroup = L.markerClusterGroup({
   disableClusteringAtZoom: 20,
 });
 map.addLayer(clusterGroup);
+
+const roadSnapLayer = L.layerGroup().addTo(map);
 
 const statusText = document.getElementById("status-text");
 const locationsSpinner = document.getElementById("locations-spinner");
@@ -50,6 +53,38 @@ function renderLocations(locations) {
     .filter((loc) => typeof loc.lat === "number" && typeof loc.lon === "number")
     .map((loc) => L.marker([loc.lat, loc.lon]).bindPopup(popupHtml(loc)));
   clusterGroup.addLayers(markers);
+  renderRoadSnaps(locations);
+}
+
+function renderRoadSnaps(locations) {
+  roadSnapLayer.clearLayers();
+  if (map.getZoom() < ROAD_SNAP_MIN_ZOOM) return;
+
+  for (const loc of locations) {
+    if (typeof loc.lat !== "number" || typeof loc.lon !== "number") continue;
+    for (const snap of loc.roadSnaps || []) {
+      if (typeof snap.lat !== "number" || typeof snap.lon !== "number") continue;
+
+      L.polyline(
+        [
+          [loc.lat, loc.lon],
+          [snap.lat, snap.lon],
+        ],
+        { color: "#e6550d", weight: 2, dashArray: "4,4" }
+      ).addTo(roadSnapLayer);
+
+      const distance = typeof snap.distanceMeter === "number" ? `${Math.round(snap.distanceMeter)} m` : "unknown distance";
+      L.circleMarker([snap.lat, snap.lon], {
+        radius: 4,
+        color: "#e6550d",
+        weight: 1,
+        fillColor: "#e6550d",
+        fillOpacity: 1,
+      })
+        .bindTooltip(`${escapeHtml(snap.mode || "road")} snap — ${distance}`)
+        .addTo(roadSnapLayer);
+    }
+  }
 }
 
 async function loadLocations() {
@@ -60,6 +95,7 @@ async function loadLocations() {
   if (zoom < CLIENT_MIN_ZOOM) {
     showZoomOverlay(true, `Current zoom ${zoom} — zoom to at least ${CLIENT_MIN_ZOOM}`);
     clusterGroup.clearLayers();
+    roadSnapLayer.clearLayers();
     setStatus("Zoom in to load GLS locations.");
     locationsSpinner.classList.add("hidden");
     return;
@@ -89,11 +125,13 @@ async function loadLocations() {
     if (!resp.ok) {
       setStatus(data.error || "Failed to load locations.");
       clusterGroup.clearLayers();
+      roadSnapLayer.clearLayers();
       return;
     }
 
     if (data.status === "area_too_large") {
       clusterGroup.clearLayers();
+      roadSnapLayer.clearLayers();
       showZoomOverlay(true, "Zoom in further — visible area is too large");
       setStatus(data.message);
       return;
@@ -101,6 +139,7 @@ async function loadLocations() {
 
     if (data.status === "too_many_results") {
       clusterGroup.clearLayers();
+      roadSnapLayer.clearLayers();
       showZoomOverlay(true, `${data.count} locations in view — zoom in further`);
       setStatus(data.message);
       return;

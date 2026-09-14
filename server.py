@@ -105,6 +105,17 @@ def simplify(item: dict) -> dict:
     comp = item.get("addressComponents") or {}
     localizations = comp.get("localizations") or []
     city = localizations[0].get("city") if localizations else None
+    road_snaps = []
+    for snap in item.get("roadSnaps") or []:
+        snap_loc = snap.get("snapLocation") or {}
+        road_snaps.append(
+            {
+                "mode": snap.get("transportationMode"),
+                "lat": snap_loc.get("latitude"),
+                "lon": snap_loc.get("longitude"),
+                "distanceMeter": snap.get("distanceInMeter"),
+            }
+        )
     return {
         "id": item.get("id"),
         "lat": loc.get("latitude"),
@@ -113,6 +124,7 @@ def simplify(item: dict) -> dict:
         "zipCode": comp.get("zipCode"),
         "city": city,
         "countryCode": comp.get("countryCode"),
+        "roadSnaps": road_snaps,
     }
 
 
