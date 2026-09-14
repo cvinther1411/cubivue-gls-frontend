@@ -96,10 +96,12 @@ function showDetailPanel(loc) {
         .map((snap) => {
           const distance = typeof snap.distanceMeter === "number" ? `${Math.round(snap.distanceMeter)} m` : "unknown";
           const coords = typeof snap.lat === "number" && typeof snap.lon === "number" ? `${snap.lat.toFixed(6)}, ${snap.lon.toFixed(6)}` : "—";
+          const nodes = (snap.nodes || []).length ? snap.nodes.join(", ") : "—";
           return `<div class="snap-entry">
             <div><strong>${escapeHtml(snap.mode || "unknown mode")}</strong></div>
             <div>Distance: ${escapeHtml(distance)}</div>
             <div>Snap point: <code>${escapeHtml(coords)}</code></div>
+            <div>Nodes: <code>${escapeHtml(nodes)}</code></div>
           </div>`;
         })
         .join("")

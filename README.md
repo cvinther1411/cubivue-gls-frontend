@@ -9,6 +9,26 @@ returns a reasonable number of points — this dataset is dense (individual
 delivery addresses, not just depots), so a wide view can mean tens of
 thousands of results.
 
+## Features
+
+- **Auto-loading locations** — fetches on pan/zoom (debounced), gated by a
+  client-side minimum zoom (15) plus a server-side check against the real
+  location count for the visible area (see below).
+- **Clustering** — markers cluster at zoom 17 and below; zoom 18+ always
+  shows individual markers.
+- **Address/city search** — powered by OSM Nominatim; pick a result to fly
+  the map to it (bounded to zoom 18 max, so a city search doesn't zoom in
+  absurdly far).
+- **Road-snap points** (zoom 19+, toggleable) — each location's nearest
+  point on the road network per transport mode, drawn as a dashed line
+  with a small marker.
+- **Voronoi areas** (toggleable, off by default) — each location's
+  approximate delivery catchment polygon, outline only.
+- **Location detail panel** — click any marker to open a panel on the
+  right with everything the API returns for it: full address, exact
+  coordinates/ID, every road-snap (mode, distance, snap point, OSM node
+  IDs), and Voronoi polygon info.
+
 ## Why there's a small backend
 
 The GLS API needs an HMAC-SHA256 request signature computed from a client
@@ -27,7 +47,9 @@ endpoints per request:
 GLS's Swagger docs (`/swagger/v2/swagger.json` on the API host) list a
 fair bit more than these two — `geocode`/`reverse-geocode`, `get-by-ids`,
 `address-wash/*` — not wired into this app, but worth knowing about if you
-extend it.
+extend it. The only mutating endpoint in the whole API is
+`TemplateManagement/AddTemplate` (v1, unrelated to location data); the
+rest — everything this app uses — is read-only.
 
 ## Setup
 

@@ -129,6 +129,7 @@ def simplify(item: dict) -> dict:
                 "lat": snap_loc.get("latitude"),
                 "lon": snap_loc.get("longitude"),
                 "distanceMeter": snap.get("distanceInMeter"),
+                "nodes": snap.get("nodes") or [],
             }
         )
     voronoi = None
