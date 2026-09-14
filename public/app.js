@@ -25,6 +25,12 @@ const zoomOverlay = document.getElementById("zoom-overlay");
 const zoomOverlayDetail = document.getElementById("zoom-overlay-detail");
 const voronoiToggle = document.getElementById("voronoi-toggle");
 const roadSnapToggle = document.getElementById("road-snap-toggle");
+const detailPanel = document.getElementById("detail-panel");
+const detailTitle = document.getElementById("detail-title");
+const detailBody = document.getElementById("detail-body");
+const detailClose = document.getElementById("detail-close");
+
+detailClose.addEventListener("click", () => detailPanel.classList.add("hidden"));
 
 voronoiToggle.addEventListener("change", () => {
   if (voronoiToggle.checked) {
@@ -55,11 +61,6 @@ function showZoomOverlay(show, detail) {
   if (detail) zoomOverlayDetail.textContent = detail;
 }
 
-function popupHtml(loc) {
-  const parts = [loc.zipCode, loc.city, loc.countryCode].filter(Boolean).join(", ");
-  return `<div class="gls-popup"><span class="label">${escapeHtml(loc.label || "")}</span>${escapeHtml(parts)}</div>`;
-}
-
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -70,10 +71,62 @@ function renderLocations(locations) {
   clusterGroup.clearLayers();
   const markers = locations
     .filter((loc) => typeof loc.lat === "number" && typeof loc.lon === "number")
-    .map((loc) => L.marker([loc.lat, loc.lon]).bindPopup(popupHtml(loc)));
+    .map((loc) => L.marker([loc.lat, loc.lon]).on("click", () => showDetailPanel(loc)));
   clusterGroup.addLayers(markers);
   renderRoadSnaps(locations);
   renderVoronoi(locations);
+}
+
+function showDetailPanel(loc) {
+  detailTitle.textContent = loc.label || "Location";
+
+  const addressRows = [
+    ["Zip code", loc.zipCode],
+    ["City", loc.city],
+    ["Country", loc.countryCode],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`)
+    .join("");
+
+  const roadSnapsHtml = (loc.roadSnaps || []).length
+    ? loc.roadSnaps
+        .map((snap) => {
+          const distance = typeof snap.distanceMeter === "number" ? `${Math.round(snap.distanceMeter)} m` : "unknown";
+          const coords = typeof snap.lat === "number" && typeof snap.lon === "number" ? `${snap.lat.toFixed(6)}, ${snap.lon.toFixed(6)}` : "—";
+          return `<div class="snap-entry">
+            <div><strong>${escapeHtml(snap.mode || "unknown mode")}</strong></div>
+            <div>Distance: ${escapeHtml(distance)}</div>
+            <div>Snap point: <code>${escapeHtml(coords)}</code></div>
+          </div>`;
+        })
+        .join("")
+    : `<div class="muted">No road-snap data.</div>`;
+
+  const voronoiVertices = loc.voronoi?.coordinates?.[0]?.length;
+  const voronoiHtml = voronoiVertices
+    ? `<div>Polygon with ${voronoiVertices} vertices. Enable "Show Voronoi areas" to view it on the map.</div>`
+    : `<div class="muted">No Voronoi area data.</div>`;
+
+  detailBody.innerHTML = `
+    <h3>Address</h3>
+    <table>${addressRows || `<tr><td colspan="2" class="muted">No address details.</td></tr>`}</table>
+
+    <h3>Coordinates</h3>
+    <table>
+      <tr><td>Latitude</td><td><code>${escapeHtml(loc.lat)}</code></td></tr>
+      <tr><td>Longitude</td><td><code>${escapeHtml(loc.lon)}</code></td></tr>
+      <tr><td>ID</td><td><code>${escapeHtml(loc.id || "—")}</code></td></tr>
+    </table>
+
+    <h3>Road snaps</h3>
+    ${roadSnapsHtml}
+
+    <h3>Voronoi area</h3>
+    ${voronoiHtml}
+  `;
+
+  detailPanel.classList.remove("hidden");
 }
 
 function renderVoronoi(locations) {
